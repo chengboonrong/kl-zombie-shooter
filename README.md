@@ -2,6 +2,8 @@
 
 A comic-book first-person zombie shooter set in a Kuala Lumpur night market. Built with Three.js, TypeScript and Vite.
 
+Built with AI coding agents for about $20 of API credit.
+
 ![Gameplay](docs/media/gameplay.gif)
 
 | Title | Wave start | Horde |
