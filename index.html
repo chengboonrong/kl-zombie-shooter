@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:," />
+<title>Pasar Malam Zombi!</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; user-select: none;
+    font-family: Impact, "Arial Black", "PingFang SC", sans-serif; color: #111; }
+  canvas { display: block; }
+  .panel { position: fixed; padding: 4px 16px; background: #fff; border: 4px solid #000; box-shadow: 6px 6px 0 #000; font-size: 30px; letter-spacing: 1px; }
+  #p-wave { top: 18px; left: 18px; background: #ffd60a; transform: rotate(-3deg); }
+  #p-kills { top: 18px; right: 18px; transform: rotate(2deg); }
+  #p-hp { bottom: 20px; left: 18px; transform: rotate(2deg); display: flex; align-items: center; gap: 10px; }
+  #hp-track { width: 200px; height: 20px; border: 3px solid #000; background: #111; }
+  #hp-bar { height: 100%; width: 100%; background: #e63946; }
+  #p-gun { bottom: 20px; right: 18px; background: #4cc9f0; transform: rotate(-2deg); }
+  #crosshair { position: fixed; left: 50%; top: 50%; width: 8px; height: 8px; margin: -7px; border: 3px solid #000; background: #fff; border-radius: 50%; }
+  #hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(transparent 45%, #e63946); }
+  #banner { position: fixed; top: 22%; width: 100%; text-align: center; font-size: 90px; font-style: italic; color: #ffd60a;
+    -webkit-text-stroke: 4px #000; text-shadow: 7px 7px 0 #000; opacity: 0; pointer-events: none; }
+  #banner.show { animation: pop 2.4s ease-out; }
+  @keyframes pop {
+    0% { opacity: 1; transform: scale(0.3) rotate(-8deg); }
+    12% { opacity: 1; transform: scale(1.15) rotate(-4deg); }
+    20%, 75% { opacity: 1; transform: scale(1) rotate(-4deg); }
+    100% { opacity: 0; transform: scale(1) rotate(-4deg); }
+  }
+  #debug { position: fixed; top: 80px; left: 18px; padding: 4px 8px; background: #000c; color: #fff; font: 13px monospace; white-space: pre; }
+  #overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+    cursor: pointer; text-align: center; background: radial-gradient(#0004 28%, transparent 30%) 0 0 / 16px 16px, #ffd60ae6; }
+  #title { font-size: 110px; line-height: 1; font-style: italic; color: #e63946; -webkit-text-stroke: 5px #000; text-shadow: 9px 9px 0 #000; transform: rotate(-4deg); }
+  #body { position: static; font-size: 28px; line-height: 1.5; transform: rotate(1deg); }
+</style>
+</head>
+<body>
+<div class="panel" id="p-wave">WAVE <span id="wave">0</span></div>
+<div class="panel" id="p-kills">KILLS <span id="kills">0</span></div>
+<div class="panel" id="p-hp">HP <span id="hp">100</span><div id="hp-track"><div id="hp-bar"></div></div></div>
+<div class="panel" id="p-gun"><span id="weapon"></span> <span id="ammo"></span></div>
+<div id="crosshair"></div>
+<div id="hurt"></div>
+<div id="banner"></div>
+<div id="debug" hidden></div>
+<div id="overlay"><div id="title"></div><div class="panel" id="body"></div></div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
