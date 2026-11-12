@@ -2,21 +2,31 @@ import * as THREE from 'three';
 import { scene, collide } from './level';
 import { player, hurt } from './player';
 import { toon, inked, canvasTex } from './toon';
+import { shake } from './fx';
 import { sfx } from './audio';
 
 export interface Zombie {
   g: THREE.Group;
-  limbs: THREE.Mesh[]; // leg L, leg R, arm L, arm R
+  parts: THREE.Mesh[];                         // torso, head, leg L, leg R, arm L, arm R
+  mats: (THREE.Material | THREE.Material[])[]; // their real materials, restored after a hit flash
   runner: boolean;
+  base: number;   // resting x/z scale
   hp: number;
   speed: number;
   dmg: number;
-  cd: number; // attack cooldown
-  t: number;  // walk-cycle phase
+  cd: number;     // attack cooldown
+  t: number;      // walk-cycle phase
+  flash: number;  // seconds of white left
+  squash: number; // 1 = fully squashed, decays to 0
+  kx: number;     // knockback velocity
+  kz: number;
 }
 
 export const zombies: Zombie[] = [];
+const dying: { z: Zombie; t: number }[] = [];
 export const MAX_ZOMBIES = 30;
+
+const WHITE = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
 const face = (skin: string) => toon(0xffffff, canvasTex(64, 64, c => {
   c.fillStyle = skin;
@@ -46,20 +56,22 @@ export function spawnZombie(runner = false, speedMul = 1) {
   if (zombies.length >= MAX_ZOMBIES) return;
   const L = LOOKS[runner ? 1 : 0];
   const g = new THREE.Group();
+  g.rotation.order = 'YXZ'; // so rotation.x tips it over relative to its facing
   const add = (m: THREE.Mesh, x: number, y: number) => {
     m.position.set(x, y, 0);
     g.add(m);
     return m;
   };
-  add(inked(0.6, 0.7, 0.35, L.shirt), 0, 1.15);
-  add(inked(0.42, 0.42, 0.42, L.head), 0, 1.72);
-  const limbs = [
+  const parts = [
+    add(inked(0.6, 0.7, 0.35, L.shirt), 0, 1.15),
+    add(inked(0.42, 0.42, 0.42, L.head), 0, 1.72),
     add(inked(0.24, 0.8, 0.26, L.pants, -0.4), -0.16, 0.8),
     add(inked(0.24, 0.8, 0.26, L.pants, -0.4), 0.16, 0.8),
     add(inked(0.18, 0.7, 0.18, L.skin, -0.35), -0.4, 1.45),
     add(inked(0.18, 0.7, 0.18, L.skin, -0.35), 0.4, 1.45),
   ];
-  if (runner) g.scale.set(0.85, 1, 0.85);
+  const base = runner ? 0.85 : 1;
+  g.scale.set(base, 1, base);
 
   // spawn at a lane end, the far one if the player is close
   let z = Math.random() < 0.5 ? -28 : 28;
@@ -68,21 +80,58 @@ export function spawnZombie(runner = false, speedMul = 1) {
 
   scene.add(g);
   zombies.push({
-    g, limbs, runner,
+    g, parts, mats: parts.map(m => m.material), runner, base,
     hp: runner ? 60 : 100,
     speed: (runner ? 4 : 1.6) * speedMul,
     dmg: runner ? 8 : 10,
     cd: 0, t: Math.random() * 6,
+    flash: 0, squash: 0, kx: 0, kz: 0,
   });
 }
 
 export function clearZombies() {
   for (const z of zombies) scene.remove(z.g);
+  for (const d of dying) scene.remove(d.z.g);
   zombies.length = 0;
+  dying.length = 0;
+}
+
+// Apply a hit: damage, white flash, squash, knockback along (dx, dz). Returns true if it died.
+export function hitZombie(z: Zombie, dmg: number, dx: number, dz: number, force: number): boolean {
+  z.hp -= dmg;
+  z.flash = 0.05;
+  z.squash = 1;
+  for (const m of z.parts) m.material = WHITE;
+  z.kx += dx * force;
+  z.kz += dz * force;
+  if (z.hp > 0) return false;
+  z.kx += dx * 4; // the killing blow throws the body
+  z.kz += dz * 4;
+  zombies.splice(zombies.indexOf(z), 1);
+  dying.push({ z, t: 0 });
+  return true;
+}
+
+// Per-frame hit reaction, shared by the living and the dying.
+function react(z: Zombie, dt: number) {
+  const p = z.g.position;
+  p.x += z.kx * dt;
+  p.z += z.kz * dt;
+  const k = Math.exp(-10 * dt);
+  z.kx *= k;
+  z.kz *= k;
+  if (z.flash > 0) {
+    z.flash -= dt;
+    if (z.flash <= 0) z.parts.forEach((m, i) => { m.material = z.mats[i]; });
+  }
+  z.squash *= Math.exp(-14 * dt);
+  const wide = z.base * (1 + 0.3 * z.squash);
+  z.g.scale.set(wide, 1 - 0.2 * z.squash, wide);
 }
 
 export function updateZombies(dt: number) {
   for (const z of zombies) {
+    react(z, dt);
     const p = z.g.position;
     const dx = player.pos.x - p.x, dz = player.pos.z - p.z;
     const d = Math.hypot(dx, dz) || 1;
@@ -99,14 +148,14 @@ export function updateZombies(dt: number) {
     }
 
     const sw = Math.sin(z.t) * 0.6;
-    z.limbs[0].rotation.x = sw;
-    z.limbs[1].rotation.x = -sw;
+    z.parts[2].rotation.x = sw;
+    z.parts[3].rotation.x = -sw;
     // walkers reach forward, runners pump their arms
-    z.limbs[2].rotation.x = z.runner ? -sw * 1.5 : -1.4 + sw * 0.2;
-    z.limbs[3].rotation.x = z.runner ? sw * 1.5 : -1.4 - sw * 0.2;
+    z.parts[4].rotation.x = z.runner ? -sw * 1.5 : -1.4 + sw * 0.2;
+    z.parts[5].rotation.x = z.runner ? sw * 1.5 : -1.4 - sw * 0.2;
 
     z.cd -= dt;
-    if (d < 1.3 && z.cd <= 0) { hurt(z.dmg); z.cd = 1; }
+    if (d < 1.3 && z.cd <= 0) { hurt(z.dmg); shake(0.035); z.cd = 1; }
   }
 
   // keep zombies from stacking
@@ -124,6 +173,21 @@ export function updateZombies(dt: number) {
   }
 
   for (const z of zombies) collide(z.g.position, 0.4);
+
+  // the dead: thrown back, knocked flat, then shrink away
+  for (let i = dying.length - 1; i >= 0; i--) {
+    const d = dying[i];
+    d.t += dt;
+    react(d.z, dt);
+    collide(d.z.g.position, 0.4);
+    d.z.g.rotation.x = -1.5 * Math.min(1, d.t / 0.25);
+    if (d.t > 0.3) d.z.g.scale.multiplyScalar(Math.max(0.01, (0.45 - d.t) / 0.15));
+    if (d.t >= 0.45) {
+      scene.remove(d.z.g);
+      dying.splice(i, 1);
+    }
+  }
+
   if (zombies.length && Math.random() < dt * 0.4) sfx.groan();
 }
 
@@ -149,13 +213,4 @@ export function rayZombies(ray: THREE.Ray, maxDist: number): { z: Zombie; head: 
     if (d < best) { best = d; res = { z, head, d }; }
   }
   return res;
-}
-
-// Returns true if the zombie died.
-export function damageZombie(z: Zombie, dmg: number): boolean {
-  z.hp -= dmg;
-  if (z.hp > 0) return false;
-  scene.remove(z.g);
-  zombies.splice(zombies.indexOf(z), 1);
-  return true;
 }

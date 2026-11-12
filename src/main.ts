@@ -4,7 +4,7 @@ import { camera, player, game, keys, resetPlayer, updatePlayer } from './player'
 import { zombies, spawnZombie, updateZombies, clearZombies, MAX_ZOMBIES } from './zombies';
 import { weapons, ws, updateWeapons, resetWeapons, gunScene, gunCam } from './weapons';
 import { spawnPickup, updatePickups, clearPickups } from './pickups';
-import { updateFx } from './fx';
+import { feel, updateFx } from './fx';
 import { initAudio, sfx } from './audio';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
@@ -96,6 +96,7 @@ function newGame() {
   clearPickups();
   game.wave = 0;
   game.kills = 0;
+  feel.stop = feel.shake = 0;
   toSpawn = 0;
   breakT = 2;
 }
@@ -166,17 +167,21 @@ function frame(now: number) {
   const dt = Math.min(raw, 0.05);
 
   if (game.state === 'play') {
-    updatePlayer(dt);
-    updateWeapons(dt);
-    updateZombies(dt);
-    updatePickups(dt);
-    updateWaves(dt);
-    updateFx(dt);
-    if (player.hp <= 0) {
-      game.state = 'over';
-      clickGuard = performance.now() + 800; // don't restart on a panicked click
-      sfx.over();
-      document.exitPointerLock();
+    if (feel.stop > 0) {
+      feel.stop -= raw; // hit stop: hold the world on the impact frame
+    } else {
+      updatePlayer(dt);
+      updateWeapons(dt);
+      updateZombies(dt);
+      updatePickups(dt);
+      updateWaves(dt);
+      updateFx(dt); // last: applies shake on top of the camera pose
+      if (player.hp <= 0) {
+        game.state = 'over';
+        clickGuard = performance.now() + 800; // don't restart on a panicked click
+        sfx.over();
+        document.exitPointerLock();
+      }
     }
   }
 
