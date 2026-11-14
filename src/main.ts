@@ -7,6 +7,7 @@ import { spawnPickup, updatePickups, clearPickups } from './pickups';
 import { feel, updateFx } from './fx';
 import { initAudio, sfx } from './audio';
 import { input, initTouch, clearTouch } from './touch';
+import { reloadState, dry, lowAmmo } from './hud';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -61,12 +62,33 @@ const $ = (id: string) => document.getElementById(id)!;
 const overlay = $('overlay'), title = $('title'), body = $('body'), dbg = $('debug');
 const waveEl = $('wave'), killsEl = $('kills'), hpEl = $('hp'), hpBar = $('hp-bar');
 const weaponEl = $('weapon'), ammoEl = $('ammo'), hurtEl = $('hurt'), bannerEl = $('banner');
+const gunEl = $('p-gun'), hpPanel = $('p-hp'), fireBtn = $('fire'), reloadBtn = $('reload'), ring = reloadBtn.querySelector('circle')!;
 dbg.hidden = !DEBUG;
 if (DEBUG) (window as unknown as { dbg: object }).dbg = { player, game, zombies, weapons, ws, solids, camera };
 
 const shown = new Map<HTMLElement, string>();
 function put(el: HTMLElement, text: string) {
   if (shown.get(el) !== text) { shown.set(el, text); el.textContent = text; }
+}
+
+// HUD classes and styles are written only when they change.
+let reloadS = '', ringOff = '', hpScale = '';
+function updateHud(w: (typeof weapons)[number]) {
+  const rs = reloadState(w, ws.reloadT);
+  if (rs !== reloadS) {
+    if (reloadS) reloadBtn.classList.remove(reloadS);
+    if (rs) reloadBtn.classList.add(rs);
+    reloadS = rs;
+  }
+  if (rs === 'busy') {
+    const off = (100 * ws.reloadT / w.reload).toFixed(0); // ring fills as the reload completes
+    if (off !== ringOff) { ringOff = off; ring.style.strokeDashoffset = off; }
+  }
+  fireBtn.classList.toggle('off', dry(w));
+  gunEl.classList.toggle('low', lowAmmo(w));
+  hpPanel.classList.toggle('low', player.hp <= 30);
+  const sx = `scaleX(${player.hp / 100})`;
+  if (sx !== hpScale) { hpScale = sx; hpBar.style.transform = sx; }
 }
 
 function banner(text: string) {
@@ -79,7 +101,7 @@ function banner(text: string) {
 const CONTROLS = 'WASD move · SHIFT sprint · SPACE jump<br>MOUSE shoot · R reload · 1–5 weapons · ESC pause';
 function showScreen() {
   const s = game.state;
-  const controls = input.touch ? 'LEFT THUMB move · RIGHT THUMB look<br>FIRE / JUMP / RELOAD buttons' : CONTROLS;
+  const controls = input.touch ? 'LEFT THUMB move · push up to sprint<br>RIGHT THUMB aim · drag on FIRE to aim while shooting<br>TAP the weapon to switch' : CONTROLS;
   const verb = input.touch ? 'TAP' : 'CLICK';
   document.body.classList.toggle('playing', s === 'play');
   overlay.style.display = s === 'play' ? 'none' : 'flex';
@@ -218,8 +240,7 @@ function frame(now: number) {
   put(hpEl, String(player.hp));
   put(weaponEl, w.name);
   put(ammoEl, ws.reloadT > 0 ? 'RELOADING…' : `${w.mag} / ${Number.isFinite(w.reserve) ? w.reserve : '∞'}`);
-  const hpW = player.hp + '%';
-  if (hpBar.style.width !== hpW) hpBar.style.width = hpW;
+  updateHud(w);
   const hurtO = (player.hurtT / 0.3).toFixed(2);
   if (hurtEl.style.opacity !== hurtO) hurtEl.style.opacity = hurtO;
 

@@ -7,14 +7,19 @@
 <title>Pasar Malam Zombi!</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #000; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; overscroll-behavior: none;
-    font-family: Impact, "Arial Black", "PingFang SC", sans-serif; color: #111; }
+    font-family: Impact, "Arial Black", "Avenir Next Condensed", "PingFang SC", sans-serif; font-weight: 900; font-synthesis: none; color: #111; }
+  * { touch-action: none; }
   canvas { display: block; }
   .panel { position: fixed; padding: 4px 16px; background: #fff; border: 4px solid #000; box-shadow: 6px 6px 0 #000; font-size: clamp(16px, 2.34vw, 30px); letter-spacing: 1px; }
   #p-wave { top: max(18px, env(safe-area-inset-top)); left: max(18px, env(safe-area-inset-left)); background: #ffd60a; transform: rotate(-3deg); }
   #p-kills { top: max(18px, env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); transform: rotate(2deg); }
   #p-hp { bottom: max(20px, env(safe-area-inset-bottom)); left: max(18px, env(safe-area-inset-left)); transform: rotate(2deg); display: flex; align-items: center; gap: 10px; }
   #hp-track { width: clamp(65px, 15.6vw, 200px); height: 20px; border: 3px solid #000; background: #111; }
-  #hp-bar { height: 100%; width: 100%; background: #e63946; }
+  #hp-bar { height: 100%; background: #e63946; transform-origin: left; }
+  #p-hp.low { background: #e63946; color: #fff; }
+  #p-hp.low #hp-bar { background: #fff; }
+  #p-gun.low #ammo { color: #e63946; }
+  #wave, #kills, #hp, #ammo { font-variant-numeric: tabular-nums; }
   #p-gun { bottom: max(20px, env(safe-area-inset-bottom)); right: max(18px, env(safe-area-inset-right)); background: #4cc9f0; transform: rotate(-2deg); }
   #crosshair { position: fixed; left: 50%; top: 50%; width: 8px; height: 8px; margin: -7px; border: 3px solid #000; background: #fff; border-radius: 50%; }
   #hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(transparent 45%, #e63946); }
@@ -32,17 +37,48 @@
     cursor: pointer; text-align: center; background: radial-gradient(#0004 28%, transparent 30%) 0 0 / 16px 16px, #ffd60ae6; }
   #title { font-size: clamp(42px, min(8.6vw, 15.3vh), 110px); line-height: 1; font-style: italic; color: #e63946; -webkit-text-stroke: 5px #000; text-shadow: 9px 9px 0 #000; transform: rotate(-4deg); }
   #body { position: static; font-size: clamp(14px, 2.18vw, 28px); line-height: 1.5; transform: rotate(1deg); }
-  #touch-controls { display: none; }
+  /* --- touch HUD: thumb-arc action cluster on the right, floating stick on the left --- */
+  .touch { --sr: max(20px, env(safe-area-inset-right)); --sl: max(20px, env(safe-area-inset-left));
+    --sb: max(18px, calc(env(safe-area-inset-bottom) + 8px)); --st: max(12px, env(safe-area-inset-top));
+    --f: clamp(76px, 22vh, 104px); --j: clamp(56px, 15vh, 70px); --rl: clamp(50px, 13vh, 62px); --g: 10px; --sk: clamp(108px, 30vh, 150px);
+    --d1: calc(var(--f) / 2 + var(--j) / 2 + var(--g)); --d2: calc(var(--f) / 2 + var(--rl) / 2 + var(--g)); }
+  @supports (height: 1svh) { .touch { --f: clamp(76px, 22svh, 104px); --j: clamp(56px, 15svh, 70px); --rl: clamp(50px, 13svh, 62px); --sk: clamp(108px, 30svh, 150px); } }
+  #touch-controls { display: none; position: fixed; inset: 0; pointer-events: none; }
   .touch.playing #touch-controls { display: block; }
-  #touch-controls { position: fixed; inset: 0; pointer-events: none; }
-  #touch-controls button { pointer-events: auto; min-width: 64px; min-height: 64px; padding: 4px; font: 18px Impact, "Arial Black", sans-serif; background: #ffd60a; color: #111; border: 4px solid #000; box-shadow: 4px 4px 0 #000; touch-action: none; }
-  #touch-controls #pause { position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); min-height: 32px; font-size: 16px; }
-  #touch-buttons { position: absolute; bottom: max(18px, env(safe-area-inset-bottom)); right: max(18px, env(safe-area-inset-right)); display: grid; grid-template-columns: 64px 84px; gap: 10px; align-items: end; }
-  #touch-controls #fire { min-height: 84px; background: #e63946; }
-  .touch #p-gun { bottom: max(184px, calc(env(safe-area-inset-bottom) + 170px)); }
-  .touch #p-hp { pointer-events: none; }
-  #stick { display: none; position: absolute; width: 100px; height: 100px; margin: -50px; border: 3px solid #000; border-radius: 50%; background: #ffffff55; }
-  #stick div { width: 40px; height: 40px; margin: 27px; border: 3px solid #000; border-radius: 50%; background: #ffd60a; }
+  .touch .panel { pointer-events: none; }
+  #touch-controls button { position: absolute; display: grid; place-items: center; padding: 0; pointer-events: auto; color: #000;
+    border: 4px solid #000; border-radius: 50%; box-shadow: 4px 4px 0 #000; -webkit-tap-highlight-color: transparent; transition: transform 50ms, box-shadow 50ms, opacity 120ms; }
+  #touch-controls button > svg, #p-gun .swap { width: 50%; height: 50%; fill: currentColor; pointer-events: none; }
+  #touch-controls .down { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #000; }
+  #touch-controls .off { opacity: 0.4; }
+  #fire { right: var(--sr); bottom: var(--sb); width: var(--f); height: var(--f); background: #e63946; }
+  #jump { width: var(--j); height: var(--j); background: #ffd60a;   /* 112 degrees on the arc around FIRE */
+    right: calc(var(--sr) + var(--f) / 2 - var(--j) / 2 + 0.3746 * var(--d1));
+    bottom: calc(var(--sb) + var(--f) / 2 - var(--j) / 2 + 0.9272 * var(--d1)); }
+  #reload { width: var(--rl); height: var(--rl); background: #4cc9f0;   /* 172 degrees */
+    right: calc(var(--sr) + var(--f) / 2 - var(--rl) / 2 + 0.9903 * var(--d2));
+    bottom: calc(var(--sb) + var(--f) / 2 - var(--rl) / 2 + 0.1392 * var(--d2)); }
+  #reload.need { background: #ffd60a; }
+  #reload .ring { position: absolute; left: -6px; top: -6px; width: calc(100% + 12px); height: calc(100% + 12px); transform: rotate(-90deg); fill: none; stroke: #ffd60a; stroke-width: 4; display: none; }
+  #reload.busy .ring { display: block; }
+  #touch-controls #pause { top: var(--st); right: var(--sr); width: 44px; height: 44px; border-radius: 0; background: #fff; box-shadow: 3px 3px 0 #000; }
+  #stick { position: absolute; width: var(--sk); height: var(--sk); margin: calc(var(--sk) / -2); left: calc(var(--sl) + var(--sk) / 2); bottom: calc(var(--sb) + var(--sk) / 2);
+    border: 4px solid #000; border-radius: 50%; background: #ffffff40; opacity: 0.45; box-sizing: border-box; }
+  #stick.live { opacity: 1; bottom: auto; }
+  #stick div { position: absolute; left: 50%; top: 50%; width: 42%; height: 42%; margin: -21%; border: 4px solid #000; border-radius: 50%;
+    background: #ffd60a; box-sizing: border-box; }
+  #stick.sprint { border-color: #e63946; }
+  #stick.sprint div { background: #e63946; }
+  /* info panels re-flow around the thumbs */
+  .touch #p-hp { left: 50%; bottom: var(--sb); transform: translateX(-50%) rotate(1deg); font-size: clamp(15px, 4.2svh, 24px); }
+  .touch #hp-track { width: clamp(80px, 13vw, 180px); height: 16px; }
+  .touch #p-kills { top: var(--st); right: calc(var(--sr) + 58px); font-size: clamp(15px, 4.2svh, 24px); }
+  .touch #p-wave { top: var(--st); left: var(--sl); font-size: clamp(15px, 4.2svh, 24px); }
+  #p-gun .swap { display: none; }
+  .touch #p-gun { right: var(--sr); bottom: calc(var(--sb) + var(--f) / 2 + 0.9272 * var(--d1) + var(--j) / 2 + 14px); pointer-events: auto;
+    display: flex; align-items: center; gap: 8px; min-height: 44px; -webkit-tap-highlight-color: transparent; box-sizing: border-box; font-size: clamp(15px, 4.4svh, 24px); }
+  .touch #p-gun .swap { display: block; width: 1.1em; height: 1.1em; flex: none; }
+  .touch #p-gun.down { transform: rotate(-2deg) translate(3px, 3px); box-shadow: 3px 3px 0 #000; }
   #rotate { display: none; }
   @media (orientation: portrait) {
     .touch #rotate { display: flex; position: fixed; inset: 0; z-index: 5; align-items: center; justify-content: center; background: #111e; }
@@ -54,13 +90,28 @@
 <div class="panel" id="p-wave">WAVE <span id="wave">0</span></div>
 <div class="panel" id="p-kills">KILLS <span id="kills">0</span></div>
 <div class="panel" id="p-hp">HP <span id="hp">100</span><div id="hp-track"><div id="hp-bar"></div></div></div>
-<div class="panel" id="p-gun"><span id="weapon"></span> <span id="ammo"></span></div>
+<div class="panel" id="p-gun" data-action="weapon"><svg class="swap" viewBox="0 0 24 24"><use href="#i-swap"/></svg><span id="weapon"></span> <span id="ammo"></span></div>
 <div id="crosshair"></div>
 <div id="hurt"></div>
 <div id="banner"></div>
 <div id="debug" hidden></div>
 <div id="overlay"><div id="title"></div><div class="panel" id="body"></div></div>
 <div id="rotate"><div class="panel">ROTATE YOUR PHONE</div></div>
+<div id="touch-controls">
+  <button id="pause" data-action="pause" aria-label="Pause"><svg viewBox="0 0 24 24"><use href="#i-pause"/></svg></button>
+  <div id="stick"><div></div></div>
+  <button id="jump" data-action="jump" aria-label="Jump"><svg viewBox="0 0 24 24"><use href="#i-jump"/></svg></button>
+  <button id="reload" data-action="reload" aria-label="Reload"><svg class="ring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" pathLength="100" stroke-dasharray="100"/></svg><svg viewBox="0 0 24 24"><use href="#i-reload"/></svg></button>
+  <button id="fire" data-action="fire" aria-label="Fire"><svg viewBox="0 0 24 24"><use href="#i-fire"/></svg></button>
+</div>
+<!-- HUD icons: original, 24-unit grid, filled ink silhouettes -->
+<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+  <symbol id="i-fire" viewBox="0 0 24 24"><path d="M12 1.5C9.4 3.6 8.3 6.3 8.3 9v7.2h7.4V9c0-2.7-1.1-5.4-3.7-7.5zM7.6 17.6h8.8v4.9H7.6z"/></symbol>
+  <symbol id="i-jump" viewBox="0 0 24 24"><path d="M12 3l8 7.5h-5L12 7.7 9 10.5H4zM12 11.5l8 7.5h-5L12 16.2 9 19H4z"/></symbol>
+  <symbol id="i-reload" viewBox="0 0 24 24"><path d="M20.5 13A8.5 8.5 0 1 1 12 4.5v3.4A5.1 5.1 0 1 0 17.1 13zM10.8 1.6l6.4 4.6-6.4 4.6z"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M3 6.5h11v-3l6.5 4.5-6.5 4.5v-3H3zM21 14.5H10v-3l-6.5 4.5 6.5 4.5v-3h11z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M5.5 4h5v16h-5zM13.5 4h5v16h-5z"/></symbol>
+</svg>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
