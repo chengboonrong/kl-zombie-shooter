@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { collide } from './level';
 import { sfx } from './audio';
+import { input } from './touch';
 
 export const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 200);
 camera.rotation.order = 'YXZ';
 
 export const keys = new Set<string>();
-export const player = { pos: new THREE.Vector3(), vy: 0, yaw: 0, pitch: 0, kick: 0, hp: 100, shells: 12, hurtT: 0 };
+export const player = { pos: new THREE.Vector3(), vy: 0, yaw: 0, pitch: 0, kick: 0, hp: 100, hurtT: 0 };
 export const game = { state: 'start' as 'start' | 'play' | 'pause' | 'over', wave: 0, kills: 0, lastShot: '-' };
 
 const EYE = 1.65, RADIUS = 0.4;
@@ -15,7 +16,6 @@ export function resetPlayer() {
   player.pos.set(0, 0, 0);
   player.vy = player.yaw = player.pitch = player.kick = player.hurtT = 0;
   player.hp = 100;
-  player.shells = 12;
 }
 
 export function hurt(dmg: number) {
@@ -34,18 +34,18 @@ addEventListener('mousemove', e => {
 });
 
 export function updatePlayer(dt: number) {
-  const f = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
-  const s = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
+  const f = input.forward + (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
+  const s = input.side + (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
   const len = Math.hypot(f, s);
   if (len > 0) {
-    const sprint = f > 0 && (keys.has('ShiftLeft') || keys.has('ShiftRight')); // forward only
-    const step = ((sprint ? 7.5 : 4.5) / len) * dt;
+    const sprint = f > 0 && (keys.has('ShiftLeft') || keys.has('ShiftRight') || input.forward > 0.9); // forward only
+    const step = ((sprint ? 7.5 : 4.5) / Math.max(1, len)) * dt;
     const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
     player.pos.x += (-sin * f + cos * s) * step;
     player.pos.z += (-cos * f - sin * s) * step;
   }
 
-  if (player.pos.y <= 0 && keys.has('Space')) player.vy = 6;
+  if (player.pos.y <= 0 && (keys.has('Space') || input.jump)) player.vy = 6;
   player.vy -= 20 * dt;
   player.pos.y += player.vy * dt;
   if (player.pos.y <= 0) { player.pos.y = 0; player.vy = 0; }

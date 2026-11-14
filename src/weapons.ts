@@ -1,19 +1,23 @@
 import * as THREE from 'three';
 import { rayLevel } from './level';
 import { camera, player, game } from './player';
-import { rayZombies, hitZombie, type Zombie } from './zombies';
+import { zombies, rayZombies, hitZombie, type Zombie } from './zombies';
 import { toon, inked, canvasTex } from './toon';
-import { pop, damageNumber, burst, hitStop, shake } from './fx';
+import { pop, damageNumber, burst, blast, hitStop, shake } from './fx';
 import { sfx } from './audio';
 import { spawnPickup } from './pickups';
+import { input, hasFocus } from './touch';
 
 // push: knockback impulse per pellet, in m/s
 export const weapons = [
-  { name: 'PISTOL', dmg: 25, pellets: 1, spread: 0.004, size: 12, mag: 12, rate: 0.25, reload: 1.2, kick: 0.03, push: 3 },
-  { name: 'SHOTGUN', dmg: 13, pellets: 8, spread: 0.07, size: 6, mag: 6, rate: 0.9, reload: 2.0, kick: 0.09, push: 1.6 },
+  { name: 'PISTOL', dmg: 25, pellets: 1, spread: 0.004, size: 12, mag: 12, rate: 0.25, reload: 1.2, kick: 0.03, push: 3, reserve: Infinity, stock: Infinity, topup: 0, barrel: [1, 1, 1], color: 0x3d4a66, sound: sfx.pistol, word: 'BANG!' },
+  { name: 'SHOTGUN', dmg: 13, pellets: 8, spread: 0.07, size: 6, mag: 6, rate: 0.9, reload: 2.0, kick: 0.09, push: 1.6, reserve: 12, stock: 12, topup: 4, barrel: [1.5, 1, 1.8], color: 0x3d4a66, sound: sfx.shotgun, word: 'BOOM!' },
+  { name: 'SMG', dmg: 14, pellets: 1, spread: 0.025, size: 30, mag: 30, rate: 0.08, reload: 1.8, kick: 0.012, push: 1, reserve: 90, stock: 90, topup: 30, barrel: [1.4, 1.6, 1.2], color: 0x222233, sound: sfx.smg, word: 'BRRRT!' },
+  { name: 'RIFLE', dmg: 90, pellets: 1, spread: 0.001, size: 5, mag: 5, rate: 1.1, reload: 2.4, kick: 0.12, push: 6, reserve: 10, stock: 10, topup: 5, barrel: [0.8, 0.8, 2.6], color: 0x69844a, sound: sfx.rifle, word: 'KRAK!' },
+  { name: 'MERCUN', dmg: 250, pellets: 1, spread: 0, size: 1, mag: 1, rate: 1.2, reload: 2.2, kick: 0.15, push: 8, reserve: 3, stock: 3, topup: 1, barrel: [1.8, 1.5, 1.5], color: 0xe63946, sound: sfx.mercun, word: 'THUMP!' },
 ];
 export const ws = { cur: 0, cd: 0, reloadT: 0, firing: false };
-const reserve = () => (ws.cur === 0 ? Infinity : player.shells);
+const reserve = () => weapons[ws.cur].reserve;
 
 // View model lives in its own scene, drawn after a depth clear, so it never clips into walls.
 export const gunScene = new THREE.Scene();
@@ -59,17 +63,20 @@ export function selectWeapon(i: number) {
   ws.cur = i;
   ws.reloadT = 0;
   ws.cd = 0.3;
-  barrel.scale.set(i ? 1.5 : 1, 1, i ? 1.8 : 1);
+  const w = weapons[i];
+  barrel.scale.set(w.barrel[0], w.barrel[1], w.barrel[2]);
+  (barrel.material as THREE.MeshToonMaterial).color.setHex(w.color);
   flash.position.z = -(0.2 * barrel.scale.z + 0.05);
 }
 
 export function resetWeapons() {
-  for (const w of weapons) w.mag = w.size;
+  for (const w of weapons) { w.mag = w.size; w.reserve = w.stock; }
   selectWeapon(0);
-  ws.reloadT = 0;
+  ws.reloadT = ws.cd = 0;
+  ws.firing = false;
 }
 
-function startReload() {
+export function startReload() {
   const w = weapons[ws.cur];
   if (ws.reloadT > 0 || w.mag === w.size || reserve() === 0) return;
   ws.reloadT = w.reload;
@@ -93,32 +100,51 @@ function shoot() {
   recoil = 1;
   flashT = 0.06;
   flash.material.rotation = Math.random() * 6;
-  if (ws.cur) sfx.shotgun(); else sfx.pistol();
+  w.sound();
   shake(ws.cur ? 0.02 : 0.004);
 
   ray.origin.copy(camera.position);
   camera.getWorldDirection(dir);
   back.copy(dir).negate();
-  pop(ws.cur ? 'BOOM!' : 'BANG!', '#e63946', tmp.set(0.5, -0.12, -1.6).applyMatrix4(camera.matrixWorld), 0.5);
+  pop(w.word, '#e63946', tmp.set(0.5, -0.12, -1.6).applyMatrix4(camera.matrixWorld), 0.5);
 
   // Damage and knockback land per pellet; the rest is tallied per zombie.
   hits.clear();
+  const tally = (z: Zombie, dmg: number, head: boolean, dx = dir.x, dz = dir.z) => {
+    const killed = hitZombie(z, dmg, dx, dz, w.push);
+    const e = hits.get(z) ?? { dmg: 0, head: false, killed: false };
+    e.dmg += dmg;
+    e.head ||= head;
+    e.killed ||= killed;
+    hits.set(z, e);
+  };
   for (let i = 0; i < w.pellets; i++) {
     ray.direction.set(dir.x + jitter(w.spread), dir.y + jitter(w.spread), dir.z + jitter(w.spread)).normalize();
     const wall = rayLevel(ray);
-    const hit = rayZombies(ray, wall);
-    if (!hit) {
-      // sparks come back off the wall, toward the shooter
-      if (wall < Infinity) burst(ray.at(wall - 0.05, tmp), back, 0xffe93b, 3, 5);
-      continue;
+    let hit = rayZombies(ray, wall);
+    if (w.name === 'MERCUN') {
+      const ground = ray.direction.y < 0 ? -ray.origin.y / ray.direction.y : Infinity;
+      const impact = ray.at(Math.min(wall, hit?.d ?? Infinity, ground, 100), new THREE.Vector3());
+      pop('KABOOM!', '#e63946', impact, 10);
+      blast(impact);
+      for (const color of [0xffd60a, 0xff3b30, 0xffffff, 0x4cc9f0]) burst(impact, tmp.set(0, 0, 0), color, 20, 15);
+      shake(0.06);
+      hitStop(0.12);
+      for (const z of [...zombies]) {
+        const p = z.g.position, dx = p.x - impact.x, dz = p.z - impact.z;
+        const d = Math.hypot(dx, 1 - impact.y, dz), len = Math.hypot(dx, dz) || 1;
+        if (d < 4) tally(z, w.dmg * (1 - d / 4), false, dx / len, dz / len);
+      }
+    } else {
+      const passed = new Set<Zombie>();
+      while (hit) {
+        tally(hit.z, w.dmg * (hit.head ? 2 : 1), hit.head);
+        if (w.name !== 'RIFLE') break;
+        passed.add(hit.z);
+        hit = rayZombies(ray, wall, passed);
+      }
+      if ((!hit || w.name === 'RIFLE') && wall < Infinity) burst(ray.at(wall - 0.05, tmp), back, 0xffe93b, 3, 5);
     }
-    const dmg = w.dmg * (hit.head ? 2 : 1);
-    const killed = hitZombie(hit.z, dmg, dir.x, dir.z, w.push);
-    const e = hits.get(hit.z) ?? { dmg: 0, head: false, killed: false };
-    e.dmg += dmg;
-    e.head = e.head || hit.head;
-    e.killed = e.killed || killed;
-    hits.set(hit.z, e);
   }
 
   let result = 'miss';
@@ -126,7 +152,7 @@ function shoot() {
     const p = z.g.position;
     tmp.set(p.x, e.head ? 1.75 : 1.2, p.z);
     burst(tmp, dir, 0xd4ff3b, e.killed ? 12 : 6, 7); // goo flies the way the bullet went
-    damageNumber(e.dmg, e.head, tmp);
+    damageNumber(Math.round(e.dmg), e.head, tmp);
     if (e.killed) {
       game.kills++;
       sfx.splat();
@@ -154,9 +180,9 @@ export function updateWeapons(dt: number) {
       ws.reloadT = 0;
       const n = Math.min(w.size - w.mag, reserve());
       w.mag += n;
-      if (ws.cur === 1) player.shells -= n;
+      w.reserve -= n;
     }
-  } else if (ws.firing && ws.cd <= 0) {
+  } else if ((ws.firing || input.fire) && hasFocus() && ws.cd <= 0) {
     shoot();
   }
 
@@ -168,11 +194,10 @@ export function updateWeapons(dt: number) {
   gun.rotation.x = recoil * 0.25 - (ws.reloadT > 0 ? 0.9 : 0); // dips while reloading
 }
 
-addEventListener('mousedown', e => { if (e.button === 0 && document.pointerLockElement) ws.firing = true; });
+addEventListener('mousedown', e => { if (e.button === 0 && hasFocus()) ws.firing = true; });
 addEventListener('mouseup', e => { if (e.button === 0) ws.firing = false; });
-addEventListener('wheel', () => { if (ws.cd <= 0) selectWeapon(1 - ws.cur); });
+addEventListener('wheel', e => { if (ws.cd <= 0) selectWeapon((ws.cur + (e.deltaY < 0 ? weapons.length - 1 : 1)) % weapons.length); });
 addEventListener('keydown', e => {
-  if (e.code === 'Digit1') selectWeapon(0);
-  if (e.code === 'Digit2') selectWeapon(1);
+  if (/^Digit[1-5]$/.test(e.code)) selectWeapon(Number(e.code.slice(-1)) - 1);
   if (e.code === 'KeyR') startReload();
 });

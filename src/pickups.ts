@@ -4,6 +4,7 @@ import { player } from './player';
 import { toon, inked, canvasTex } from './toon';
 import { pop } from './fx';
 import { sfx } from './audio';
+import { weapons } from './weapons';
 
 type Kind = 'health' | 'ammo';
 
@@ -20,7 +21,7 @@ const MATS = {
   }),
 };
 
-const SPOTS = [[0, -18], [-2, -6], [2, 3], [0, 20], [11, -4], [-2, 14]];
+const SPOTS = [[0, -18], [-2, -6], [2, 3], [0, 20], [11, -4], [-2, 14], [0, 54], [0, 63], [-18, 40], [-36, 40], [18, 40], [36, 40]];
 const pickups: { m: THREE.Mesh; kind: Kind }[] = [];
 
 // With no position, picks a random fixed spot (health and ammo sit side by side).
@@ -48,7 +49,7 @@ export function updatePickups(dt: number) {
       if (player.hp >= 100) continue; // leave it for later
       player.hp = Math.min(100, player.hp + 35);
     } else {
-      player.shells += 4;
+      for (const w of weapons) w.reserve += w.topup;
     }
     pop(p.kind === 'health' ? '+HP!' : '+AMMO!', '#2a9d8f', p.m.position, 1.2);
     sfx.pickup();

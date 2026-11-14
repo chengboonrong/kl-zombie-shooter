@@ -59,6 +59,24 @@ export const sfx = {
     hiss(1, 0.32, 700);
     hiss(0.7, 0.07, 3500, 'highpass');
   },
+  smg: () => {
+    tone('sine', 180, 60, 0.6, 0.08);
+    hiss(0.45, 0.07, 1800, 'bandpass');
+    hiss(0.4, 0.025, 6000, 'highpass');
+  },
+  rifle: () => {
+    tone('sine', 120, 30, 1.1, 0.35);
+    hiss(0.8, 0.2, 1100, 'bandpass');
+    hiss(0.9, 0.05, 6500, 'highpass');
+  },
+  mercun: () => {
+    tone('sine', 150, 45, 0.9, 0.15);
+    hiss(0.5, 0.12, 700, 'bandpass');
+    hiss(0.3, 0.03, 3500, 'highpass');
+    tone('sine', 70, 20, 1.3, 0.6, 0.04);
+    hiss(1, 0.5, 900, 'lowpass', 0.04);
+    hiss(0.9, 0.12, 5000, 'highpass', 0.04);
+  },
   hit: () => {
     tone('sine', 130, 55, 0.6, 0.09);
     hiss(0.5, 0.08, 800, 'bandpass');

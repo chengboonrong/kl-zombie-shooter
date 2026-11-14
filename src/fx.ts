@@ -95,8 +95,29 @@ export function burst(pos: THREE.Vector3, dir: THREE.Vector3, color: number, n: 
   }
 }
 
+const blastSphere = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), new THREE.MeshBasicMaterial({
+  color: 0xffd60a, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide,
+}));
+blastSphere.visible = false;
+scene.add(blastSphere);
+let blastT = 0;
+export function blast(pos: THREE.Vector3) {
+  blastSphere.position.copy(pos);
+  blastSphere.scale.setScalar(0.01);
+  blastSphere.material.opacity = 0.35;
+  blastSphere.visible = true;
+  blastT = 0.2;
+}
+
 // Call last each frame: it also applies shake on top of the camera pose.
 export function updateFx(dt: number) {
+  if (blastT > 0) {
+    blastT = Math.max(0, blastT - dt);
+    blastSphere.scale.setScalar(4 * (1 - blastT / 0.2));
+    blastSphere.material.opacity = 0.35 * blastT / 0.2;
+    blastSphere.visible = blastT > 0;
+  }
+
   for (let i = pops.length - 1; i >= 0; i--) {
     const f = pops[i];
     f.t += dt;

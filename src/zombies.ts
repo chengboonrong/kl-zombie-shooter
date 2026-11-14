@@ -1,9 +1,11 @@
 import * as THREE from 'three';
-import { scene, collide } from './level';
+import { scene, collide, solids } from './level';
 import { player, hurt } from './player';
 import { toon, inked, canvasTex } from './toon';
 import { shake } from './fx';
 import { sfx } from './audio';
+import { navTarget, clearLine } from './nav';
+import { steer } from './steer';
 
 export interface Zombie {
   g: THREE.Group;
@@ -20,6 +22,16 @@ export interface Zombie {
   squash: number; // 1 = fully squashed, decays to 0
   kx: number;     // knockback velocity
   kz: number;
+  navT: number;
+  target: number[];
+  lastX: number;
+  lastZ: number;
+  step: number;
+  stuckT: number;
+  sideT: number;
+  side: number;
+  sideX: number;
+  sideZ: number;
 }
 
 export const zombies: Zombie[] = [];
@@ -73,10 +85,10 @@ export function spawnZombie(runner = false, speedMul = 1) {
   const base = runner ? 0.85 : 1;
   g.scale.set(base, 1, base);
 
-  // spawn at a lane end, the far one if the player is close
-  let z = Math.random() < 0.5 ? -28 : 28;
-  if (Math.abs(z - player.pos.z) < 12) z = -z;
-  g.position.set((Math.random() - 0.5) * 8, 0, z);
+  const ends = [[0, -28], [0, 64], [-40, 40], [40, 40]].filter(([x, z]) => Math.hypot(x - player.pos.x, z - player.pos.z) >= 12);
+  const [x, z] = ends[Math.floor(Math.random() * ends.length)];
+  const spread = (Math.random() - 0.5) * 8;
+  g.position.set(x + (x === 0 ? spread : 0), 0, z + (x === 0 ? 0 : spread));
 
   scene.add(g);
   zombies.push({
@@ -85,7 +97,8 @@ export function spawnZombie(runner = false, speedMul = 1) {
     speed: (runner ? 4 : 1.6) * speedMul,
     dmg: runner ? 8 : 10,
     cd: 0, t: Math.random() * 6,
-    flash: 0, squash: 0, kx: 0, kz: 0,
+    flash: 0, squash: 0, kx: 0, kz: 0, navT: Math.random() * 0.25, target: [g.position.x, g.position.z],
+    lastX: g.position.x, lastZ: g.position.z, step: 0, stuckT: 0, sideT: 0, side: Math.random() < 0.5 ? -1 : 1, sideX: 0, sideZ: 0,
   });
 }
 
@@ -135,11 +148,18 @@ export function updateZombies(dt: number) {
     const p = z.g.position;
     const dx = player.pos.x - p.x, dz = player.pos.z - p.z;
     const d = Math.hypot(dx, dz) || 1;
-    z.g.rotation.y = Math.atan2(dx, dz);
 
+    z.navT -= dt;
+    if (z.navT <= 0) { z.target = navTarget(p.x, p.z, player.pos.x, player.pos.z); z.navT += 0.25; }
+    const nx = z.target[0] - p.x, nz = z.target[1] - p.z, nd = Math.hypot(nx, nz) || 1;
+    z.g.rotation.y = d < 1.3 || clearLine(p.x, p.z, player.pos.x, player.pos.z) ? Math.atan2(dx, dz) : Math.atan2(nx, nz);
+    z.step = 0;
     if (d > 0.9) {
-      p.x += (dx / d) * z.speed * dt;
-      p.z += (dz / d) * z.speed * dt;
+      z.step = Math.min(nd, z.speed * dt);
+      const sx = z.sideT > 0 && d >= 1.3 ? z.sideX : nx / nd;
+      const sz = z.sideT > 0 && d >= 1.3 ? z.sideZ : nz / nd;
+      p.x += sx * z.step;
+      p.z += sz * z.step;
       z.t += dt * (3 + z.speed * 2);
     } else if (d < 0.7) {
       // player walked into us: get shoved back
@@ -172,7 +192,25 @@ export function updateZombies(dt: number) {
     }
   }
 
-  for (const z of zombies) collide(z.g.position, 0.4);
+  for (const z of zombies) {
+    const p = z.g.position;
+    collide(p, 0.4);
+    const moved = Math.hypot(p.x - z.lastX, p.z - z.lastZ);
+    const sideT = z.sideT;
+    [z.stuckT, z.sideT] = steer(z.stuckT, z.sideT, moved, z.step, Math.hypot(p.x - player.pos.x, p.z - player.pos.z), dt);
+    // Hold the escape direction so steering cannot curve back into the prop.
+    if (z.sideT > 0 && sideT === 0) {
+      const dx = z.target[0] - p.x, dz = z.target[1] - p.z, d = Math.hypot(dx, dz) || 1;
+      z.sideX = -dz / d * z.side;
+      z.sideZ = dx / d * z.side;
+      const x = p.x + z.sideX * 1.2, zz = p.z + z.sideZ * 1.2;
+      if (solids.some(b => Math.hypot(x - Math.max(b.min.x, Math.min(x, b.max.x)), zz - Math.max(b.min.z, Math.min(zz, b.max.z))) < 0.4 - 1e-6)) {
+        z.sideX = -z.sideX; z.sideZ = -z.sideZ;
+      }
+    }
+    z.lastX = p.x;
+    z.lastZ = p.z;
+  }
 
   // the dead: thrown back, knocked flat, then shrink away
   for (let i = dying.length - 1; i >= 0; i--) {
@@ -193,10 +231,11 @@ export function updateZombies(dt: number) {
 
 // Nearest zombie hit by the ray within maxDist. Head box is tested first.
 const hb = new THREE.Box3(), hp = new THREE.Vector3();
-export function rayZombies(ray: THREE.Ray, maxDist: number): { z: Zombie; head: boolean; d: number } | null {
+export function rayZombies(ray: THREE.Ray, maxDist: number, skip = new Set<Zombie>()): { z: Zombie; head: boolean; d: number } | null {
   let best = maxDist;
   let res: { z: Zombie; head: boolean; d: number } | null = null;
   for (const z of zombies) {
+    if (skip.has(z)) continue;
     const p = z.g.position;
     let head = true;
     hb.min.set(p.x - 0.25, 1.5, p.z - 0.25);

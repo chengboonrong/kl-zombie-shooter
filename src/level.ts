@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { toon, canvasTex, INK } from './toon';
+import { addWall } from './nav';
 
 export const scene = new THREE.Scene();
 export const solids: THREE.Box3[] = [];   // block movement (checked in XZ only)
@@ -10,7 +11,7 @@ const mats = new Map<number, THREE.Material>();
 const hulls: THREE.Matrix4[] = [];
 const INK_T = 0.05;
 
-interface Opt { y?: number; solid?: boolean; glow?: boolean; mat?: THREE.Material }
+interface Opt { y?: number; solid?: boolean; glow?: boolean; mat?: THREE.Material; wall?: boolean }
 
 // x, z: centre. w, d: size along x, z. h: height. o.y: bottom (default 0).
 // Boxes resting on the ground are solid unless told otherwise.
@@ -33,6 +34,7 @@ function box(x: number, z: number, w: number, d: number, h: number, color: numbe
   const b = new THREE.Box3().setFromCenterAndSize(mesh.position, mesh.scale);
   blockers.push(b);
   if (o.solid ?? y0 === 0) solids.push(b);
+  if (o.wall) addWall(b.min.x, b.min.z, b.max.x, b.max.z);
 }
 
 const FONT = '"Arial Black", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
@@ -128,7 +130,7 @@ export function buildLevel() {
   }
 
   buildSky();
-  box(0, 0, 40, 64, 1, 0x4a4466, { y: -1 }); // asphalt
+  box(0, 18, 90, 100, 1, 0x4a4466, { y: -1 }); // asphalt
 
   // shop-lot facade: shuttered ground floor, two windows upstairs, one lit
   const facade = canvasTex(256, 256, c => {
@@ -163,9 +165,9 @@ export function buildLevel() {
     m.emissiveMap = glow;
     return m;
   });
-  for (let i = 0; i < 12; i++) box(-9, -27.5 + i * 5, 6, 5, 6.5 + (i % 3) * 0.5, 0, { mat: LOTS[i % 5] });           // west row
-  for (let i = 0; i < 4; i++) box(11.5, -27.5 + i * 5, 11, 5, 7.5 - (i % 3) * 0.5, 0, { mat: LOTS[(i + 2) % 5] });   // east, south of mamak
-  for (let i = 0; i < 5; i++) box(11.5, 4.8 + i * 5.6, 11, 5.6, 6.5 + (i % 3) * 0.5, 0, { mat: LOTS[(i + 1) % 5] }); // east, north of mamak
+  for (let i = 0; i < 12; i++) box(-9, -27.5 + i * 5, 6, 5, 6.5 + (i % 3) * 0.5, 0, { wall: true, mat: LOTS[i % 5] });           // west row
+  for (let i = 0; i < 4; i++) box(11.5, -27.5 + i * 5, 11, 5, 7.5 - (i % 3) * 0.5, 0, { wall: true, mat: LOTS[(i + 2) % 5] });   // east, south of mamak
+  for (let i = 0; i < 5; i++) box(11.5, 4.8 + i * 5.6, 11, 5.6, 6.5 + (i % 3) * 0.5, 0, { wall: true, mat: LOTS[(i + 1) % 5] }); // east, north of mamak
 
   // shop signs: [side, z, main line, second line]
   const SHOPS: [number, number, string, string][] = [
@@ -185,29 +187,61 @@ export function buildLevel() {
   SHOPS.forEach(([s, z, a, b], i) => sign(a, b, COLS[i % 6][0], COLS[i % 6][1], s * 5.93, 3.4, z, 4.2, 0.9, (-s * Math.PI) / 2));
 
   // lane ends: hoardings
-  box(0, -30.5, 12, 1, 3, 0xffc300);
-  box(0, 30.5, 12, 1, 3, 0xffc300);
+  box(0, -30.5, 12, 1, 3, 0xffc300, { wall: true });
+  box(0, 66.5, 12, 1, 3, 0xffc300, { wall: true });
   sign('JALAN DITUTUP · ROAD CLOSED', '此路不通', '#111', '#ffd60a', 0, 1.9, -29.93, 6, 1.2, 0);
-  sign('JALAN DITUTUP · ROAD CLOSED', '此路不通', '#111', '#ffd60a', 0, 1.9, 29.93, 6, 1.2, Math.PI);
+  sign('JALAN DITUTUP · ROAD CLOSED', '此路不通', '#111', '#ffd60a', 0, 1.9, 65.93, 6, 1.2, Math.PI);
+
+  // Lots meet at the corners so the street boundary has no gaps.
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 4; i++) {
+      const z = 48.5 + i * 5;
+      box(side * 9, z, 6, 5, 7, 0, { wall: true, mat: LOTS[i % 5] });
+      sign(['KEDAI ROTI BULAN', 'DOBI BERSIH', 'KEDAI BUKU RIMBA', 'KOPI PAGI'][i], 'OPEN DAILY · 每日营业', '#2a9d8f', '#fff', side * 5.93, 3.4, z, 4.2, 0.9, -side * Math.PI / 2);
+    }
+    for (const edge of [-1, 1]) for (let i = 0; i < 6; i++) {
+      if (edge > 0 && i === 0) continue;
+      const x = side * (9 + i * 6), z = edge < 0 ? 32 : 49;
+      box(x, z, 6, edge < 0 ? 4 : 6, 7 + i % 2, 0, { wall: true, mat: LOTS[(i + 1) % 5] });
+      sign(['KEDAI EMAS MANGGIS', 'PASAR SAYUR SEGAR', 'KEDAI KAIN PELANGI', 'BENGKEL JAYA', 'KEDAI TEH WANGI', 'ROTI NAGA'][i], 'JALAN PASAR · MARKET STREET', '#ffd60a', '#111', x, 3.4, 40 + edge * 5.93, 5, 0.9, edge < 0 ? 0 : Math.PI);
+    }
+    box(side * 42.5, 40, 1, 12, 3, 0xffc300, { wall: true });
+    sign('JALAN DITUTUP', 'ROAD CLOSED · 此路不通', '#111', '#ffd60a', side * 41.93, 1.9, 40, 6, 1.2, -side * Math.PI / 2);
+  }
+  sign('JALAN PASAR', '巴刹街', '#1d3557', '#fff', 0, 5, 46, 6, 1, Math.PI);
+  // A durian monument sits off the centre lines, leaving all four routes open.
+  box(3.5, 43.5, 1.8, 1.8, 0.5, 0x9999aa);
+  box(3.5, 43.5, 1.2, 1.2, 1.4, 0x9bc53d, { y: 0.5, solid: true });
+  for (const dx of [-0.5, 0, 0.5]) for (const dz of [-0.5, 0, 0.5]) box(3.5 + dx, 43.5 + dz, 0.18, 0.18, 0.3, 0xffd166, { y: 1.9 });
 
   // hawker stalls: counter, tarp, poles, goods
   const TARPS = [0xe63946, 0x1d7cf2, 0xffd60a, 0x2a9d8f], GOODS = [0xff9f1c, 0x9bc53d, 0xc77dff];
   let n = 0;
-  const stall = (x: number, z: number) => {
-    const s = Math.sign(x);
-    box(x, z, 1.5, 3, 1, 0xf1e3c6);
-    box(x - s * 0.2, z, 1.9, 3.4, 0.12, TARPS[n % 4], { y: 2.6 });
-    box(x - s * 0.7, z - 1.6, 0.08, 0.08, 2.6, 0x333344, { solid: false });
-    box(x - s * 0.7, z + 1.6, 0.08, 0.08, 2.6, 0x333344, { solid: false });
-    box(x, z - 0.7, 0.6, 0.6, 0.35, GOODS[n % 3], { y: 1 });
-    box(x, z + 0.6, 0.5, 0.8, 0.25, GOODS[(n + 1) % 3], { y: 1 });
+  const stall = (x: number, z: number, cross = false) => {
+    const s = cross ? Math.sign(z - 40) : Math.sign(x);
+    const put = (a: number, b: number, w: number, d: number, h: number, c: number, o: Opt = {}) =>
+      cross ? box(x + b, z + a, d, w, h, c, o) : box(x + a, z + b, w, d, h, c, o);
+    put(0, 0, 1.5, 3, 1, 0xf1e3c6);
+    put(-s * 0.2, 0, 1.9, 3.4, 0.12, TARPS[n % 4], { y: 2.6 });
+    put(-s * 0.7, -1.6, 0.08, 0.08, 2.6, 0x333344, { solid: false });
+    put(-s * 0.7, 1.6, 0.08, 0.08, 2.6, 0x333344, { solid: false });
+    put(0, -0.7, 0.6, 0.6, 0.35, GOODS[n % 3], { y: 1 });
+    put(0, 0.6, 0.5, 0.8, 0.25, GOODS[(n + 1) % 3], { y: 1 });
     n++;
   };
   for (const z of [-24, -16, -8, 0, 18, 25]) stall(-5.25, z);
   for (const z of [-25, -17, 6, 15, 23]) stall(5.25, z);
 
+  for (const z of [51, 60]) { stall(-5.25, z); stall(5.25, z); }
+  for (const x of [-34, -22, 22, 34]) stall(x, 45.25, true);
+
+  for (const x of [-32, -20, 20, 32]) {
+    box(x, 40, 0.04, 12, 0.04, 0x111111, { y: 5.4 });
+    for (let z = 36; z <= 44; z += 2) box(x, z, 0.45, 0.45, 0.55, 0xff3b30, { y: 4.8, glow: true });
+  }
+
   // lantern strings across the lane
-  for (const z of [-24, -15, 1, 17, 25]) {
+  for (const z of [-24, -15, 1, 17, 25, 51, 60]) {
     box(0, z, 12, 0.04, 0.04, 0x111111, { y: 5.4 });
     for (let x = -4; x <= 4; x += 2) box(x, z, 0.45, 0.45, 0.55, 0xff3b30, { y: 4.8, glow: true });
   }
@@ -227,7 +261,7 @@ export function buildLevel() {
   sign('LRT · STESEN PASAR LAMA', '老街站', '#fff', '#1d3557', 0, 8.75, 12.56, 9, 1.1, 0);
 
   // mamak corner
-  box(17.5, -4, 1, 12, 7, 0xf1faee);
+  box(17.5, -4, 1, 12, 7, 0xf1faee, { wall: true });
   sign('RESTORAN MAMAK SELERA MALAM', 'TEH TARIK · ROTI CANAI · 24 JAM · 嘛嘛档', '#2a9d8f', '#fff', 16.93, 4.2, -4, 9, 1.5, -Math.PI / 2);
   for (const [x, z] of [[9, -7], [13, -7], [9, -1], [13, -1]]) {
     box(x, z, 0.15, 0.15, 0.75, 0x333344, { solid: false });

@@ -2,23 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <link rel="icon" href="data:," />
 <title>Pasar Malam Zombi!</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; user-select: none;
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; overscroll-behavior: none;
     font-family: Impact, "Arial Black", "PingFang SC", sans-serif; color: #111; }
   canvas { display: block; }
-  .panel { position: fixed; padding: 4px 16px; background: #fff; border: 4px solid #000; box-shadow: 6px 6px 0 #000; font-size: 30px; letter-spacing: 1px; }
-  #p-wave { top: 18px; left: 18px; background: #ffd60a; transform: rotate(-3deg); }
-  #p-kills { top: 18px; right: 18px; transform: rotate(2deg); }
-  #p-hp { bottom: 20px; left: 18px; transform: rotate(2deg); display: flex; align-items: center; gap: 10px; }
-  #hp-track { width: 200px; height: 20px; border: 3px solid #000; background: #111; }
+  .panel { position: fixed; padding: 4px 16px; background: #fff; border: 4px solid #000; box-shadow: 6px 6px 0 #000; font-size: clamp(16px, 2.34vw, 30px); letter-spacing: 1px; }
+  #p-wave { top: max(18px, env(safe-area-inset-top)); left: max(18px, env(safe-area-inset-left)); background: #ffd60a; transform: rotate(-3deg); }
+  #p-kills { top: max(18px, env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); transform: rotate(2deg); }
+  #p-hp { bottom: max(20px, env(safe-area-inset-bottom)); left: max(18px, env(safe-area-inset-left)); transform: rotate(2deg); display: flex; align-items: center; gap: 10px; }
+  #hp-track { width: clamp(65px, 15.6vw, 200px); height: 20px; border: 3px solid #000; background: #111; }
   #hp-bar { height: 100%; width: 100%; background: #e63946; }
-  #p-gun { bottom: 20px; right: 18px; background: #4cc9f0; transform: rotate(-2deg); }
+  #p-gun { bottom: max(20px, env(safe-area-inset-bottom)); right: max(18px, env(safe-area-inset-right)); background: #4cc9f0; transform: rotate(-2deg); }
   #crosshair { position: fixed; left: 50%; top: 50%; width: 8px; height: 8px; margin: -7px; border: 3px solid #000; background: #fff; border-radius: 50%; }
   #hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(transparent 45%, #e63946); }
-  #banner { position: fixed; top: 22%; width: 100%; text-align: center; font-size: 90px; font-style: italic; color: #ffd60a;
+  #banner { position: fixed; top: 22%; width: 100%; text-align: center; font-size: clamp(36px, 7vw, 90px); font-style: italic; color: #ffd60a;
     -webkit-text-stroke: 4px #000; text-shadow: 7px 7px 0 #000; opacity: 0; pointer-events: none; }
   #banner.show { animation: pop 2.4s ease-out; }
   @keyframes pop {
@@ -27,11 +27,27 @@
     20%, 75% { opacity: 1; transform: scale(1) rotate(-4deg); }
     100% { opacity: 0; transform: scale(1) rotate(-4deg); }
   }
-  #debug { position: fixed; top: 80px; left: 18px; padding: 4px 8px; background: #000c; color: #fff; font: 13px monospace; white-space: pre; }
-  #overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+  #debug { position: fixed; top: 80px; left: max(18px, env(safe-area-inset-left)); padding: 4px 8px; background: #000c; color: #fff; font: 13px monospace; white-space: pre; }
+  #overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(12px, 3vh, 28px);
     cursor: pointer; text-align: center; background: radial-gradient(#0004 28%, transparent 30%) 0 0 / 16px 16px, #ffd60ae6; }
-  #title { font-size: 110px; line-height: 1; font-style: italic; color: #e63946; -webkit-text-stroke: 5px #000; text-shadow: 9px 9px 0 #000; transform: rotate(-4deg); }
-  #body { position: static; font-size: 28px; line-height: 1.5; transform: rotate(1deg); }
+  #title { font-size: clamp(42px, min(8.6vw, 15.3vh), 110px); line-height: 1; font-style: italic; color: #e63946; -webkit-text-stroke: 5px #000; text-shadow: 9px 9px 0 #000; transform: rotate(-4deg); }
+  #body { position: static; font-size: clamp(14px, 2.18vw, 28px); line-height: 1.5; transform: rotate(1deg); }
+  #touch-controls { display: none; }
+  .touch.playing #touch-controls { display: block; }
+  #touch-controls { position: fixed; inset: 0; pointer-events: none; }
+  #touch-controls button { pointer-events: auto; min-width: 64px; min-height: 64px; padding: 4px; font: 18px Impact, "Arial Black", sans-serif; background: #ffd60a; color: #111; border: 4px solid #000; box-shadow: 4px 4px 0 #000; touch-action: none; }
+  #touch-controls #pause { position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); min-height: 32px; font-size: 16px; }
+  #touch-buttons { position: absolute; bottom: max(18px, env(safe-area-inset-bottom)); right: max(18px, env(safe-area-inset-right)); display: grid; grid-template-columns: 64px 84px; gap: 10px; align-items: end; }
+  #touch-controls #fire { min-height: 84px; background: #e63946; }
+  .touch #p-gun { bottom: max(184px, calc(env(safe-area-inset-bottom) + 170px)); }
+  .touch #p-hp { pointer-events: none; }
+  #stick { display: none; position: absolute; width: 100px; height: 100px; margin: -50px; border: 3px solid #000; border-radius: 50%; background: #ffffff55; }
+  #stick div { width: 40px; height: 40px; margin: 27px; border: 3px solid #000; border-radius: 50%; background: #ffd60a; }
+  #rotate { display: none; }
+  @media (orientation: portrait) {
+    .touch #rotate { display: flex; position: fixed; inset: 0; z-index: 5; align-items: center; justify-content: center; background: #111e; }
+    #rotate .panel { position: static; font-size: clamp(20px, 6vw, 30px); }
+  }
 </style>
 </head>
 <body>
@@ -44,6 +60,7 @@
 <div id="banner"></div>
 <div id="debug" hidden></div>
 <div id="overlay"><div id="title"></div><div class="panel" id="body"></div></div>
+<div id="rotate"><div class="panel">ROTATE YOUR PHONE</div></div>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

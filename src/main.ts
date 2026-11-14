@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { scene, buildLevel } from './level';
+import { scene, buildLevel, solids } from './level';
 import { camera, player, game, keys, resetPlayer, updatePlayer } from './player';
 import { zombies, spawnZombie, updateZombies, clearZombies, MAX_ZOMBIES } from './zombies';
-import { weapons, ws, updateWeapons, resetWeapons, gunScene, gunCam } from './weapons';
+import { weapons, ws, selectWeapon, startReload, updateWeapons, resetWeapons, gunScene, gunCam } from './weapons';
 import { spawnPickup, updatePickups, clearPickups } from './pickups';
 import { feel, updateFx } from './fx';
 import { initAudio, sfx } from './audio';
+import { input, initTouch, clearTouch } from './touch';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -43,8 +44,8 @@ postScene.add(quad);
 const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
 function resize() {
-  // never render more than 1080 rows, whatever the display density
-  const pr = Math.min(devicePixelRatio, 1080 / innerHeight);
+  // Cap rows regardless of display density, with a lower budget on phones.
+  const pr = Math.min(devicePixelRatio, (input.touch ? 720 : 1080) / innerHeight);
   renderer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight);
   rt.setSize(Math.round(innerWidth * pr), Math.round(innerHeight * pr));
@@ -61,6 +62,7 @@ const overlay = $('overlay'), title = $('title'), body = $('body'), dbg = $('deb
 const waveEl = $('wave'), killsEl = $('kills'), hpEl = $('hp'), hpBar = $('hp-bar');
 const weaponEl = $('weapon'), ammoEl = $('ammo'), hurtEl = $('hurt'), bannerEl = $('banner');
 dbg.hidden = !DEBUG;
+if (DEBUG) (window as unknown as { dbg: object }).dbg = { player, game, zombies, weapons, ws, solids, camera };
 
 const shown = new Map<HTMLElement, string>();
 function put(el: HTMLElement, text: string) {
@@ -74,15 +76,18 @@ function banner(text: string) {
   bannerEl.classList.add('show');
 }
 
-const CONTROLS = 'WASD move · SHIFT sprint · SPACE jump<br>MOUSE shoot · R reload · 1 / 2 weapons · ESC pause';
+const CONTROLS = 'WASD move · SHIFT sprint · SPACE jump<br>MOUSE shoot · R reload · 1–5 weapons · ESC pause';
 function showScreen() {
   const s = game.state;
+  const controls = input.touch ? 'LEFT THUMB move · RIGHT THUMB look<br>FIRE / JUMP / RELOAD buttons' : CONTROLS;
+  const verb = input.touch ? 'TAP' : 'CLICK';
+  document.body.classList.toggle('playing', s === 'play');
   overlay.style.display = s === 'play' ? 'none' : 'flex';
-  if (s === 'start') { title.innerHTML = 'PASAR MALAM<br>ZOMBI!'; body.innerHTML = `${CONTROLS}<br>CLICK TO START`; }
-  if (s === 'pause') { title.innerHTML = 'PAUSED'; body.innerHTML = `${CONTROLS}<br>CLICK TO RESUME`; }
+  if (s === 'start') { title.innerHTML = 'PASAR MALAM<br>ZOMBI!'; body.innerHTML = `${controls}<br>${verb} TO START`; }
+  if (s === 'pause') { title.innerHTML = 'PAUSED'; body.innerHTML = `${controls}<br>${verb} TO RESUME`; }
   if (s === 'over') {
     title.innerHTML = 'GAME OVER!';
-    body.innerHTML = `WAVES SURVIVED: ${Math.max(0, game.wave - 1)}<br>KILLS: ${game.kills}<br>CLICK TO PLAY AGAIN`;
+    body.innerHTML = `WAVES SURVIVED: ${Math.max(0, game.wave - 1)}<br>KILLS: ${game.kills}<br>${verb} TO PLAY AGAIN`;
   }
 }
 
@@ -129,21 +134,40 @@ function updateWaves(dt: number) {
   }
 }
 
-// --- pointer lock drives the state machine ---
+// --- start and pause ---
 let clickGuard = 0;
 overlay.addEventListener('click', () => {
   if (performance.now() < clickGuard) return;
   initAudio();
+  if (input.touch) {
+    if (game.state !== 'pause') newGame();
+    game.state = 'play';
+    showScreen();
+    return;
+  }
   // Chrome rejects the promise if you re-lock too soon after Esc; ignore that
   (canvas.requestPointerLock() as unknown as Promise<void> | undefined)?.catch(() => {});
 });
+function pause() {
+  ws.firing = false;
+  keys.clear();
+  clearTouch();
+  if (game.state === 'play') game.state = 'pause';
+  if (document.pointerLockElement) document.exitPointerLock();
+  showScreen();
+}
+initTouch(pause, () => { resize(); showScreen(); }, startReload, () => selectWeapon((ws.cur + 1) % weapons.length));
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+addEventListener('blur', pause);
 document.addEventListener('pointerlockchange', () => {
+  if (input.touch) return;
   if (document.pointerLockElement) {
     if (game.state !== 'pause') newGame();
     game.state = 'play';
   } else {
     ws.firing = false;
     keys.clear();
+    clearTouch();
     if (game.state === 'play') game.state = 'pause';
   }
   showScreen();
@@ -180,7 +204,10 @@ function frame(now: number) {
         game.state = 'over';
         clickGuard = performance.now() + 800; // don't restart on a panicked click
         sfx.over();
+        ws.firing = false;
+        clearTouch();
         document.exitPointerLock();
+        showScreen();
       }
     }
   }
@@ -190,7 +217,7 @@ function frame(now: number) {
   put(killsEl, String(game.kills));
   put(hpEl, String(player.hp));
   put(weaponEl, w.name);
-  put(ammoEl, ws.reloadT > 0 ? 'RELOADING…' : `${w.mag} / ${ws.cur ? player.shells : '∞'}`);
+  put(ammoEl, ws.reloadT > 0 ? 'RELOADING…' : `${w.mag} / ${Number.isFinite(w.reserve) ? w.reserve : '∞'}`);
   const hpW = player.hp + '%';
   if (hpBar.style.width !== hpW) hpBar.style.width = hpW;
   const hurtO = (player.hurtT / 0.3).toFixed(2);
