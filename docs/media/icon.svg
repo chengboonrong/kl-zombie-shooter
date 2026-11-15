@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<title>Pasar Malam Zombi!</title>
+<!-- Lettering outlined from Anton (The Anton Project Authors, SIL Open Font License 1.1) -->
+<defs>
+  <pattern id="dots" width="11" height="11" patternUnits="userSpaceOnUse"><circle cx="5.5" cy="5.5" r="3.1" fill="#b3202d"/></pattern>
+  <pattern id="dots-p" width="11" height="11" patternUnits="userSpaceOnUse"><circle cx="5.5" cy="5.5" r="3.1" fill="#7563d9"/></pattern>
+  <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0.5" stop-color="#000"/><stop offset="1" stop-color="#fff"/></linearGradient>
+  <mask id="lower" maskUnits="userSpaceOnUse" x="-40" y="218.39999999999998" width="1084.16" height="441.6">
+    <rect x="-40" y="218.39999999999998" width="1084.16" height="441.6" fill="url(#fade)"/>
+  </mask>
+</defs>
+<defs><pattern id="ground" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="9" cy="9" r="3.4" fill="#0003"/></pattern></defs>
+<rect width="512" height="512" rx="96" fill="#ffd60a"/>
+<rect width="512" height="512" rx="96" fill="url(#ground)"/>
+<g transform="translate(248.0 252.0) scale(0.9902207167832167) translate(-282.176 -413.11744)">
+  <g transform="translate(19.8,26.4)"><g stroke="#000" stroke-width="37.400000000000006" stroke-linejoin="round" fill="#000"><g transform="rotate(7 264.0 413.11744)"><path d="M150.4,266.68543999999997 h227.20000000000002 l36.352000000000004,-19.993600000000004 v292.86400000000003 l-36.352000000000004,19.993600000000004 h-227.20000000000002 z"/></g></g></g>
+  <g stroke="#000" stroke-width="37.400000000000006" stroke-linejoin="round" fill="#000"><g transform="rotate(7 264.0 413.11744)"><path d="M150.4,266.68543999999997 h227.20000000000002 l36.352000000000004,-19.993600000000004 v292.86400000000003 l-36.352000000000004,19.993600000000004 h-227.20000000000002 z"/></g></g>
+  <g transform="rotate(7 264.0 413.11744)">
+    <g fill="#a99bf5"><rect x="150.4" y="266.68543999999997" width="227.20000000000002" height="292.86400000000003" rx="10"/></g><path d="M377.6,266.68543999999997 l36.352000000000004,-19.993600000000004 v292.86400000000003 l-36.352000000000004,19.993600000000004 z" fill="#7563d9"/>
+    <circle cx="214.016" cy="372.11647999999997" r="45.440000000000005" fill="#efeaff" stroke="#000" stroke-width="19.0848"/><rect x="217.1968" y="361.66528" width="16.3584" height="16.3584" fill="#000"/><circle cx="318.528" cy="363.33056" r="49.07520000000001" fill="#efeaff" stroke="#000" stroke-width="20.611584000000004"/><rect x="300.606464" y="363.58502400000003" width="17.667072" height="17.667072" fill="#000"/><polyline points="195.84,462.90432000000004 212.88,492.19072 229.92000000000002,462.90432000000004 246.96,492.19072 264.0,462.90432000000004 281.03999999999996,492.19072 298.08,462.90432000000004 315.12,492.19072 332.15999999999997,462.90432000000004" fill="none" stroke="#000" stroke-width="17.04" stroke-linejoin="miter" stroke-linecap="square"/>
+  </g>
+</g>
+</svg>

@@ -1,4 +1,4 @@
-# Pasar Malam Zombi!
+<h1><img src="docs/media/logo.svg" alt="Pasar Malam Zombi!" width="560"></h1>
 
 A comic-book first-person zombie shooter set in a Kuala Lumpur night market. Built with Three.js, TypeScript and Vite.
 

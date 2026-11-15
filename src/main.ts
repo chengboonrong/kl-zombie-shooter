@@ -59,7 +59,7 @@ resize();
 
 // --- HUD and screens ---
 const $ = (id: string) => document.getElementById(id)!;
-const overlay = $('overlay'), title = $('title'), body = $('body'), dbg = $('debug');
+const overlay = $('overlay'), logo = $('logo'), title = $('title'), body = $('body'), dbg = $('debug');
 const waveEl = $('wave'), killsEl = $('kills'), hpEl = $('hp'), hpBar = $('hp-bar');
 const weaponEl = $('weapon'), ammoEl = $('ammo'), hurtEl = $('hurt'), bannerEl = $('banner');
 const gunEl = $('p-gun'), hpPanel = $('p-hp'), fireBtn = $('fire'), reloadBtn = $('reload'), ring = reloadBtn.querySelector('circle')!;
@@ -105,7 +105,9 @@ function showScreen() {
   const verb = input.touch ? 'TAP' : 'CLICK';
   document.body.classList.toggle('playing', s === 'play');
   overlay.style.display = s === 'play' ? 'none' : 'flex';
-  if (s === 'start') { title.innerHTML = 'PASAR MALAM<br>ZOMBI!'; body.innerHTML = `${controls}<br>${verb} TO START`; }
+  logo.hidden = s !== 'start';
+  title.hidden = s === 'start';
+  if (s === 'start') { body.innerHTML = `${controls}<br>${verb} TO START`; }
   if (s === 'pause') { title.innerHTML = 'PAUSED'; body.innerHTML = `${controls}<br>${verb} TO RESUME`; }
   if (s === 'over') {
     title.innerHTML = 'GAME OVER!';
