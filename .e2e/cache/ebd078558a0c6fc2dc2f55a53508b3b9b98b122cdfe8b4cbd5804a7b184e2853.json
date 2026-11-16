@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "trace-1",
+  "createdAt": "2026-11-16T13:39:29.137Z",
+  "payload": {
+    "actions": [
+      {
+        "name": "pressKey",
+        "summary": "press \"2\" on the focused field",
+        "key": "2"
+      }
+    ],
+    "executor": {
+      "name": "claude-code",
+      "version": "1"
+    },
+    "recordedFor": {
+      "testId": "tests/acceptance.e2e.ts::acceptance::a%20player%20can%20start%20the%20game%20and%20pick%20the%20shotgun",
+      "targetId": "web",
+      "instructionDigest": "a25de7e8ab0bcc791b565411f5068f551723b3aad98d50fbd986e1957de7862c",
+      "paramsDigest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "callIndex": 0,
+      "agent": "default"
+    },
+    "summary": "Pressed key 2. The weapon label changed from PISTOL to SHOTGUN and the ammo now reads 6 / 12.",
+    "startPath": "/?debug",
+    "endPath": "/?debug",
+    "endAnchors": [
+      {
+        "text": "SHOTGUN"
+      },
+      {
+        "text": "6 / 12"
+      },
+      {
+        "text": "fps 11 | zombies 5 | wave 1 | pos 0.0, 0.0, 0.0 | last shot -"
+      }
+    ],
+    "goneAnchors": [
+      {
+        "text": "PISTOL"
+      },
+      {
+        "text": "12 / ∞"
+      },
+      {
+        "text": "fps 11 | zombies 3 | wave 1 | pos 0.0, 0.0, 0.0 | last shot -"
+      }
+    ],
+    "endWaitMs": 14873,
+    "keyedBy": {
+      "cacheSchema": "trace-1",
+      "policyVersion": "conservative/6",
+      "project": "cf1d63876309693adec3fd926b82447b2a243f36b8dad76402ed1aaca3b2e285",
+      "platform": "web",
+      "engineName": "web",
+      "engineSpiVersion": 1,
+      "appIdentity": "4d4d84d7eb441b9423986889b76fcdb528615053c2bbe5471f662151ad0228f5",
+      "agentContextDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

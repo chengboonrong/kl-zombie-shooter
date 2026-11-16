@@ -1,2 +1,7 @@
 node_modules
 dist
+.e2e/results
+.e2e/logs
+.e2e/report.json
+.e2e/junit.xml
+.e2e/timings.json

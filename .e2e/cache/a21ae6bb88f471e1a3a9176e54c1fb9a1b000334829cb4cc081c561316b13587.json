@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "trace-1",
+  "createdAt": "2026-11-16T13:39:29.136Z",
+  "payload": {
+    "actions": [
+      {
+        "name": "tap",
+        "summary": "tap node \"WASD move · SHIFT sprint · SPACE jump M…\"",
+        "target": {
+          "text": "WASD move · SHIFT sprint · SPACE jump MOUSE shoot · R reload · 1–5 weapons · ESC pause CLICK TO START"
+        }
+      }
+    ],
+    "executor": {
+      "name": "claude-code",
+      "version": "1"
+    },
+    "recordedFor": {
+      "testId": "tests/acceptance.e2e.ts::acceptance::a%20player%20can%20start%20the%20game%20and%20pick%20the%20shotgun",
+      "targetId": "web",
+      "instructionDigest": "7cd2ef33f33fe6253f2e419c2c34a7eb51032be16539e33864d143ddc181b699",
+      "paramsDigest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "callIndex": 0,
+      "agent": "default"
+    },
+    "summary": "Clicked the start overlay. The game started: the overlay is gone, the HUD shows WAVE 1, 1 zombie, HP 100 and PISTOL 12/∞, and the screenshot shows the night-market street in first person.",
+    "startPath": "/?debug",
+    "endPath": "/?debug",
+    "endAnchors": [
+      {
+        "text": "WAVE 1"
+      },
+      {
+        "text": "WAVE 1!"
+      },
+      {
+        "text": "fps 11 | zombies 2 | wave 1 | pos 0.0, 0.0, 0.0 | last shot -"
+      }
+    ],
+    "goneAnchors": [
+      {
+        "text": "WAVE 0"
+      },
+      {
+        "text": "fps 1 | zombies 0 | wave 0 | pos 0.0, 0.0, 0.0 | last shot -"
+      },
+      {
+        "role": "image",
+        "name": "Pasar Malam Zombi!"
+      },
+      {
+        "text": "WASD move · SHIFT sprint · SPACE jump MOUSE shoot · R reload · 1–5 weapons · ESC pause CLICK TO START"
+      }
+    ],
+    "endWaitMs": 18600,
+    "keyedBy": {
+      "cacheSchema": "trace-1",
+      "policyVersion": "conservative/6",
+      "project": "cf1d63876309693adec3fd926b82447b2a243f36b8dad76402ed1aaca3b2e285",
+      "platform": "web",
+      "engineName": "web",
+      "engineSpiVersion": 1,
+      "appIdentity": "4d4d84d7eb441b9423986889b76fcdb528615053c2bbe5471f662151ad0228f5",
+      "agentContextDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}
