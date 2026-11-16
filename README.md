@@ -33,3 +33,13 @@ npm run dev      # http://localhost:5173
 
 Survive the waves. Clearing a wave drops health and ammo.
 Add `?debug` to the URL for an FPS readout (toggle with <kbd>`</kbd>, <kbd>Z</kbd> spawns a horde).
+
+## Tests
+
+| Command | What it runs |
+|---|---|
+| `npm test` | Unit tests (Node test runner) |
+| `npm run e2e` | Browser tests with [e2e](https://github.com/e2e-inc/e2e): start, waves, firing, reload, weapon switch, pause, kills, game over. No AI model needed. |
+| `npm run e2e:accept` | Acceptance: an agent drives the game and judges screenshots of the title, gameplay and game-over screens. Runs on your Claude Code login. |
+
+The first run downloads Chromium. Recorded agent actions in `.e2e/cache/` replay without model calls.
